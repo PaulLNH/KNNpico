@@ -9,7 +9,10 @@ function onScoreUpdate(dropPosition, bounciness, size, bucketLabel) {
 
 function runAnalysis() {
   const testSetSize = 100;
-  const [testSet, trainingSet] = splitDataset(outputs, testSetSize);
+
+  const k = 10;
+
+
 
   // let numberCorrect = 0;
   // for (let i = 0; i < testSet.length; i++) {
@@ -19,25 +22,37 @@ function runAnalysis() {
   //   }
   // }
 
-  _.range(1, 20).forEach(k => {
+  _.range(0, 3).forEach(feature => {
+    // Isolates the feature and the label into a new array
+    // example: drop and bucket [300, 4] or bounce and bucket [.5, 4]
+    const data = _.map(outputs, row => [row[feature], _.last(row)]);
+
+    const [testSet, trainingSet] = splitDataset(minMax(data, 1), testSetSize);
+    // feature0 = dropPosition, feature1 = bounce, feature2 = ballSize
     // Refactored if statement in lodash:
     const accuracy = _.chain(testSet)
-      .filter(testPoint => knn(trainingSet, testPoint[0], k) === testPoint[3])
+      .filter(testPoint => knn(trainingSet, _.initial(testPoint), k) === _.last(testPoint))
       .size()
       .divide(testSetSize)
       .value();
 
-    console.log(`Accuracy for K of ${k} is: ${accuracy}`);
+    console.log(`Accuracy for feature of ${feature} is: ${accuracy}`);
   });
 }
 
+// 
 function knn(data, point, k) {
   // Start a lodash chain and pass in our outputs arrya
   return (
     _.chain(data)
       // Create a new array with only the dropPosition and bucketLabel
       // get the absolute value of these numbers
-      .map(row => [distance(row[0], point), row[3]])
+      .map(row => {
+        return[
+          distance(_.initial(row), point),
+          _.last(row)
+        ]
+      })
       // Sort by drop position
       .sortBy(row => row[0])
       // Only keep the top 'k' results
@@ -88,4 +103,24 @@ function splitDataset(data, testCount) {
   const trainingSet = _.slice(shuffled, testCount);
 
   return [testSet, trainingSet];
+}
+
+function minMax(data, featureCount) {
+  const clonedData = _.cloneDeep(data);
+
+  // Iterate through the number of features we want to normalize
+  // also iterating through the columns of a dataset [300, 0.4, 16, 4]
+  for (let i = 0; i < featureCount; i++) {
+    const column = clonedData.map(row => row[i]);
+
+    const min = _.min(column);
+    const max = _.max(column);
+
+    for (let j = 0; j < clonedData.length; j++) {
+      // 'j' is referencing the row, 'i' is the column we want to update
+      clonedData[j][i] = (clonedData[j][i] - min) / (max - min);
+    }
+  }
+
+  return clonedData;
 }
